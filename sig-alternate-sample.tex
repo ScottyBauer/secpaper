@@ -346,6 +346,12 @@ system call, RDI and RSI points to the arguments (shell in our case) respectivel
 When the executable is loaded, it overwrites the return address with the sigreturn
 system call address and loads the fake ucontext frame to launch the shell.
 
+\begin{figure}
+\centering
+\includegraphics[height=2.5in, width=3in]{exploit.pdf}
+\caption{Stack frame of exploit code}
+\end{figure}
+
 \subsection{Citations}
 Citations to articles \cite{bowman:reasoning,
 clark:pct, braams:babel, herlihy:methodology},
