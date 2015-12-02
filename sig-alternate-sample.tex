@@ -21,7 +21,7 @@ Scott Bauer\\
 
 \maketitle
 \begin{abstract}
-As exploitation mitigations advance attackers look for new methods to control the flow of a program after exploiting a vulnerability. Recent exploit mitigations such as StackCookies [CITE ME], Data Execution Prevention (W^X) [CITE ME] and Address Space Layout Ranomization (ASLR) [CITE ME], have forced exploit authors to use techniques that jump around the text segment of an ELF in memory to achieve code execution. The newest form of exploitation, Sigreturn Oriented Programming (SROP), uses signal frames, and the kernel to achieve code execution by tricking the kernel to change the instruction pointer to some arbitrary location in the code.\\
+As exploitation mitigations advance attackers look for new methods to control the flow of a program after exploiting a vulnerability. Recent exploit mitigations such as StackCookies [CITE ME], Data Execution Prevention \(W^X\) [CITE ME] and Address Space Layout Ranomization (ASLR) [CITE ME], have forced exploit authors to use techniques that jump around the text segment of an ELF in memory to achieve code execution. The newest form of exploitation, Sigreturn Oriented Programming (SROP), uses signal frames, and the kernel to achieve code execution by tricking the kernel to change the instruction pointer to some arbitrary location in the code.\\
 Signals are one of the commonly used kernel to user/user to user asynchronous notification mechanisms in UNIX. By registering a signal handler, a process can handle these asynchronous events outside its control flow. As signal frames are stored on the process stack, attackers can create exploits by setting up dummy signal frames on the stack and initiate returns from signals that the kernel never delivered. This method bypasses all current exploit mitigation techniques and  appears more convenient as kernel never keeps track of the signals it delivered.\\
 We develop a mechanism on top of the 4.1 Linux kernel to systematically stop SROP exploitaion.
 
@@ -76,6 +76,28 @@ point to 0x33 so that it runs in 64 bit mode, RAX set to syscall number of execv
 system call, RDI and RSI points to the arguments (shell in our case) respectively.
 When the executable is loaded, it overwrites the return address with the sigreturn
 system call address and loads the fake ucontext frame to launch the shell.
+\subsection{Mitigating SROP}
+To mitigate SROP exploits we need the kernel to remember or to be able to derive whether or not the signal frame placed on the user stack is legitimate. A legitimate signal frame is defined as a frame that was placed on the stack, by the kernel, during the delivery of an outstanding signal. If the kernel can determine the legitimacy of a signal frame it can then detect signal frames that are apart of a SROP exploit. To give the kernel the ability to detect legitimate signal frames we place a cookie within the signal frame that will be audited during the \textit{sigreturn} system call. If there is no cookie in the frame, or the cookie in the frame doesn't match what the kernel expects, the process is gracefully terminated with a SIGSEV.
+\subsubsection{Design Choices}
+There are a series of design choices we have to make in order to build a defense mechanism that is fast, secure and could be accepted by the upstream kernel developers. The decision to use a cookie within the signal frame comes from the stack buffer overflow mechanism in StackGuard \[CITE ME\]. A cookie in the signal frame increases the length of the frame only by 8 bytes, a small price to pay for protections against an exploitation method. To verify the cookie during a \textit{sigreturn} system call we need to remember the cookies we've placed in the frame. One idea is to save every cookie in a list on the process' local storage struct. This method fails for multiple reasons. First being an attacker could send many signals to a process causing the list to get filled up with cookies, after a certian time the range of outstanding cookies is reduced, possibly allowing an attacker to guess a correct cookie in the list. The second reason this fails is in implementation details. In order to save the cookies in this mechanism the kernel would have to allocate memory for nodes in the linked list on the signal-fast path. More over, on the sigreturn path the kernel would have to walk a linked list, possibly quite large, searching for the cookie. Another approach we designed, but quickly shot down, was to hash the entire signal frame and save the hash at the bottom of the signal frame. We quickly realized an attacker could hash their custom signal frame, place the hash at the bottom, thus trickin the kernel. We decided the following goals had to be met:\\
+\begin{itemize}
+  \item The kernel shouldn't have to remember every cookie it puts in a signal frame.
+  \item The signal delivery code, and sigreturn code needs to remain fast.
+  \item The only location the cookie should be saved is on the process' stack.
+  \item The cookie should not be the same for every signal, even within the same process.
+\end{itemize}
+%To mitigate SROP the kernel needs to remember during signal delivery that a signal was sent to the userland process. That way during the \textit{sigreturn} systemcall the kernel can verify that it is actually handling the cleanup of a signal it sent. %
+\subsubsection{Implementation}
+To realize the goals outlined in the previous section we came up with the following implementation. Each process will generate a 64 bit secret during startup, the secret will be held in the process's control block. During delivery of a signal, the kernel will generate a cookie based on the 64 bit secret as well as the address, in user-land, of where the cookie will be stored. From there the kernel places the cookie at the address and continues with normal signal delivery. Upon execution of a \textit{sigreturn} system call, the kernel extracts the cookie from the frame, it then does the same calculation as above. If the calculated and extracted cookie differ then either the process broke the ABI by moving the signal frame, or there was an exploitation attempt. This implementation meets all the goals we outlined in the previous section. The kernel doesn't have to remember every cookie it places in a frame, it only has to remember a secret used in the cookie calculation. The signal delivery and signalreturn code remain fast, no memory allocations or costly list walks occur. The cookie changes for each signal due to the fact we use the memory address of where the cookie is to be stored in the actual cookie calculation.
+\\
+\indent
+We implemented this protection mechanism on top of the 4.1 Linux tree, we selected 4.1 instead of mainline due to mainline not running correctly in our Xen virtual machine. We generate the cookie using the following code:
+\\
+\begin{verbatim}
+        sig_cookie = hash_64( ((unsigned long) &frame->sig_cookie ^ current->sigret_secret),
+                              sizeof(unsigned long) * BITS_PER_BYTE);
+\end{verbatim}
+
 
 \section{Related Work}
 For this work, \cite{bosman2014framing} is most relevant and a one 
