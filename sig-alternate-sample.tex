@@ -78,11 +78,11 @@
 %\crdata{0-12345-67-8/90/01}  % Allows default copyright data (0-89791-88-6/97/05) to be over-ridden - IF NEED BE.
 % --- End of Author Metadata ---
 
-\title{Alternate {\ttlit ACM} SIG Proceedings Paper in LaTeX
-Format\titlenote{(Produces the permission block, and
+\title{Mitigating signal handler exploits in Linux
+\titlenote{(Produces the permission block, and
 copyright information). For use with
 SIG-ALTERNATE.CLS. Supported by ACM.}}
-\subtitle{[Extended Abstract]
+%\subtitle{[Extended Abstract]
 \titlenote{A full version of this paper is available as
 \textit{Author's Guide to Preparing ACM SIG Proceedings Using
 \LaTeX$2_\epsilon$\ and BibTeX} at
@@ -112,7 +112,7 @@ SIG-ALTERNATE.CLS. Supported by ACM.}}
 % without further effort on your part as the last section in
 % the body of your article BEFORE References or any Appendices.
 
-\numberofauthors{8} %  in this sample file, there are a *total*
+\numberofauthors{2} %  in this sample file, there are a *total*
 % of EIGHT authors. SIX appear on the 'first-page' (for formatting
 % reasons) and the remaining two appear in the \additionalauthors section.
 %
@@ -129,45 +129,19 @@ SIG-ALTERNATE.CLS. Supported by ACM.}}
 %
 % 1st. author
 \alignauthor
-Ben Trovato\titlenote{Dr.~Trovato insisted his name be first.}\\
+Abhiram Balasubramanian\titlenote{Dr.~Trovato insisted his name be first.}\\
        \affaddr{Institute for Clarity in Documentation}\\
        \affaddr{1932 Wallamaloo Lane}\\
        \affaddr{Wallamaloo, New Zealand}\\
        \email{trovato@corporation.com}
 % 2nd. author
 \alignauthor
-G.K.M. Tobin\titlenote{The secretary disavows
+Scott Bauer\titlenote{The secretary disavows
 any knowledge of this author's actions.}\\
        \affaddr{Institute for Clarity in Documentation}\\
        \affaddr{P.O. Box 1212}\\
        \affaddr{Dublin, Ohio 43017-6221}\\
        \email{webmaster@marysville-ohio.com}
-% 3rd. author
-\alignauthor Lars Th{\o}rv{\"a}ld\titlenote{This author is the
-one who did all the really hard work.}\\
-       \affaddr{The Th{\o}rv{\"a}ld Group}\\
-       \affaddr{1 Th{\o}rv{\"a}ld Circle}\\
-       \affaddr{Hekla, Iceland}\\
-       \email{larst@affiliation.org}
-\and  % use '\and' if you need 'another row' of author names
-% 4th. author
-\alignauthor Lawrence P. Leipuner\\
-       \affaddr{Brookhaven Laboratories}\\
-       \affaddr{Brookhaven National Lab}\\
-       \affaddr{P.O. Box 5000}\\
-       \email{lleipuner@researchlabs.org}
-% 5th. author
-\alignauthor Sean Fogarty\\
-       \affaddr{NASA Ames Research Center}\\
-       \affaddr{Moffett Field}\\
-       \affaddr{California 94035}\\
-       \email{fogartys@amesres.org}
-% 6th. author
-\alignauthor Charles Palmer\\
-       \affaddr{Palmer Research Laboratories}\\
-       \affaddr{8600 Datapoint Drive}\\
-       \affaddr{San Antonio, Texas 78229}\\
-       \email{cpalmer@prl.com}
 }
 % There's nothing stopping you putting the seventh, eighth, etc.
 % author on the opening page (as the 'third row') but we ask,
@@ -285,92 +259,92 @@ specifically available for denoting the structure of a
 proceedings paper, rather than with giving rigorous descriptions
 or explanations of such commands.
 
-\section{The {\secit Body} of The Paper}
-Typically, the body of a paper is organized
-into a hierarchical structure, with numbered or unnumbered
-headings for sections, subsections, sub-subsections, and even
-smaller sections.  The command \texttt{{\char'134}section} that
-precedes this paragraph is part of such a
-hierarchy.\footnote{This is the second footnote.  It
-starts a series of three footnotes that add nothing
-informational, but just give an idea of how footnotes work
-and look. It is a wordy one, just so you see
-how a longish one plays out.} \LaTeX\ handles the numbering
-and placement of these headings for you, when you use
-the appropriate heading commands around the titles
-of the headings.  If you want a sub-subsection or
-smaller part to be unnumbered in your output, simply append an
-asterisk to the command name.  Examples of both
-numbered and unnumbered headings will appear throughout the
-balance of this sample document.
+\section {Background}
+\subsection{Signal Handling in Linux}
+\subsection{Signal Return Oriented Programming}
 
-Because the entire article is contained in
-the \textbf{document} environment, you can indicate the
-start of a new paragraph with a blank line in your
-input file; that is why this sentence forms a separate paragraph.
+\section{Related Work}
+For this work, \textit{Framing Signals - Return to portable shell code} 
+is most relevant and a one stop reference. The paper provides 
+detailed technical information on signal handling on UNIX based 
+systems and introduces SROP as a generic exploitation technique. 
+It also points to hints on abusing sigreturn system call, backdoor 
+techniques based on SROP and ways to mitigate SROP attacks. 
 
-\subsection{Type Changes and {\subsecit Special} Characters}
-We have already seen several typeface changes in this sample.  You
-can indicate italicized words or phrases in your text with
-the command \texttt{{\char'134}textit}; emboldening with the
-command \texttt{{\char'134}textbf}
-and typewriter-style (for instance, for computer code) with
-\texttt{{\char'134}texttt}.  But remember, you do not
-have to indicate typestyle changes when such changes are
-part of the \textit{structural} elements of your
-article; for instance, the heading of this subsection will
-be in a sans serif\footnote{A third footnote, here.
-Let's make this a rather short one to
-see how it looks.} typeface, but that is handled by the
-document class file. Take care with the use
-of\footnote{A fourth, and last, footnote.}
-the curly braces in typeface changes; they mark
-the beginning and end of
-the text that is to be in the different typeface.
+\par In our current work, we have implemented a simple execve based 
+exploit technique and a stack cookie based kernel level implementation
+to address the exploitation as suggested in the paper. The paper authors
+have also submitted a kernel patch targeting a different approach - counter
+per process in the kernel space that keeps track of number of signal handlers
+currently executing, the counter increases on signal delivery and decreases
+on sigreturn path. Although this technique prevents SROP technique, it has
+its own drawbacks in terms of counter roll-over and creates complications with
+multi-threaded applications. We presume that these are some valid reasons why
+the patch has not made it into the mainline kernel. In contrast, our approach 
+is more elegant and leaves less to no room for the attacker to guess the cookie
+value. Moreover, techniques suggested in the paper target older kernel versions, 
+we have tested the exploit and the kernel fix on the latest kernel version (4.3).
 
-You can use whatever symbols, accented characters, or
-non-English characters you need anywhere in your document;
-you can find a complete list of what is
-available in the \textit{\LaTeX\
-User's Guide}\cite{Lamport:LaTeX}.
+\par As SROP is a type of an ROP attack, we find \textit{StackGuard: 
+Automatic Adaptive Detection and Prevention of Buffer-Overflow Attacks. Cowan}
+related as this work implements a compiler feature which adds a cookie to the stack, 
+as well as support to verify the cookie upon return of a function.  Buffer overflow 
+attacks are probably the most famous form of attack gaining notoriety in the early 90’s
+The method works by modifying gcc such that it generates code that places a
+32 bit identifier on the stack before the return address during a call instruction.
+Also prior to a return gcc has the function call a verify method which validates 
+that the 32 bit identifier is the same identifier that was placed there previously.
+This research is very similar to the approach we have taken to prevent SROP.  
+We utilize a stack cookie generated by the kernel to prevent an attacker from 
+creating an arbitrary signal frame on the stack causing the kernel to jump arbitrarily 
+through the code.
 
-\subsection{Math Equations}
-You may want to display math equations in three distinct styles:
-inline, numbered or non-numbered display.  Each of
-the three are discussed in the next sections.
+\par Another relevant reference is \textit{Defeating Return-Oriented Rootkits With 
+“Return-less” Kernels} as the work implements a compiler technique to prevent ret 
+instructions from being generated in a kernel image. By removing ret instructions from 
+the kernel it prevents an entire class of attack, Return Oriented Programming (ROP) from 
+ever occurring because the fundamental feature of the attack is removed. The authors 
+modify LLVM such that it will never generate a ret op-code, as well as will never generate 
+a sequence of instructions that contain a ret op-code, if you were to jump between 
+instructions. Instead of developing a technique to systematically remove the necessary 
+elements for the attack we have used a hardening technique to prevent the attack.
 
-\subsubsection{Inline (In-text) Equations}
-A formula that appears in the running text is called an
-inline or in-text formula.  It is produced by the
-\textbf{math} environment, which can be
-invoked with the usual \texttt{{\char'134}begin. . .{\char'134}end}
-construction or with the short form \texttt{\$. . .\$}. You
-can use any of the symbols and structures,
-from $\alpha$ to $\omega$, available in
-\LaTeX\cite{Lamport:LaTeX}; this section will simply show a
-few examples of in-text equations in context. Notice how
-this equation: \begin{math}\lim_{n\rightarrow \infty}x=0\end{math},
-set here in in-line math style, looks slightly different when
-set in display style.  (See next section).
+\section {System Implementation}
+We classify the system implementation in two sections - construction
+of the exploit and the kernel implementation to mitigate the exploitation.
 
-\subsubsection{Display Equations}
-A numbered display equation -- one set off by vertical space
-from the text and centered horizontally -- is produced
-by the \textbf{equation} environment. An unnumbered display
-equation is produced by the \textbf{displaymath} environment.
+\subsection{A simple SROP exploit}
+We implemented an exploit by carefully constructing a stack frame to give
+control to a shellcode. The key idea in creating this exploit is to make
+the instruction pointer (IP) point to the code that we want to execute. 
+Unlike return oriented programming, SROP needs to know the location of 
+code that executes a sigreturn system call. To accomplish this, we simply
+created a gadget function that respects the system ABI to execute a system
+call. Essentially, the gadget sets the system register RAX with the syscall
+number (0x15 for sigreturn) and calls syscall instruction to execute sigreturn.
 
-Again, in either environment, you can use any of the symbols
-and structures available in \LaTeX; this section will just
-give a couple of examples of display equations in context.
-First, consider the equation, shown as an inline equation above:
-\begin{equation}\lim_{n\rightarrow \infty}x=0\end{equation}
-Notice how it is formatted somewhat differently in
-the \textbf{displaymath}
-environment.  Now, we'll enter an unnumbered equation:
-\begin{displaymath}\sum_{i=0}^{\infty} x + 1\end{displaymath}
-and follow it with another numbered equation:
-\begin{equation}\sum_{i=0}^{\infty}x_i=\int_{0}^{\pi+2} f\end{equation}
-just to demonstrate \LaTeX's able handling of numbering.
+\subsubsection{Finding gadgets}
+\par The ideal way of constructing an attack is to find an address of a
+syscall instruction in the system address map. Although the vsyscall area provides 
+an address of a syscall instruction, on 64­bit kernels the area is emulated. 
+The kernel has a mechanism to check if the syscall number was the one which the 
+vsycall area supports to execute, if not, the kernel throws a SIGSEV error 
+saying an exploit has been attempted.  
+\par So, in order to get the exploit working, we placed a gadget with a syscall 
+instruction and have the code point to this gadget instead of the vsyscall area.
+Although there are other methods to find the syscall address, such as finding a 
+syscall address in libc shared library, this method is more elegant and simple to 
+construct the attack.
+
+\subsubsection{Preparing arbitrary code execution}
+In order to execute the shellcode, we first need to ensure that sigreturn system
+call executes successfuly so that it restores the shellcode context later on. We
+place a fake ucontext frame on stack such that it executes a execve instruction to
+load shell. For this purpose, it is important to set the code segment register to 
+point to 0x33 so that it runs in 64bit mode, RAX set to syscall number of execve
+system call, RDI and RSI points to the arguments (shell in our case) respectively.
+When the executable is loaded, it overwrites the return address with the sigreturn
+system call address and loads the fake ucontext frame to launch the shell.
 
 \subsection{Citations}
 Citations to articles \cite{bowman:reasoning,
