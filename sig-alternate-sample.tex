@@ -76,6 +76,13 @@ point to 0x33 so that it runs in 64 bit mode, RAX set to syscall number of execv
 system call, RDI and RSI points to the arguments (shell in our case) respectively.
 When the executable is loaded, it overwrites the return address with the sigreturn
 system call address and loads the fake ucontext frame to launch the shell.
+
+\begin{figure}
+\centering
+\includegraphics[height=2.5in, width=3in]{exploit.pdf}
+\caption{Stack frame of exploit code}
+\end{figure}
+
 \subsection{Mitigating SROP}
 To mitigate SROP exploits we need the kernel to remember or to be able to derive whether or not the signal frame placed on the user stack is legitimate. A legitimate signal frame is defined as a frame that was placed on the stack, by the kernel, during the delivery of an outstanding signal. If the kernel can determine the legitimacy of a signal frame it can then detect signal frames that are apart of a SROP exploit. To give the kernel the ability to detect legitimate signal frames we place a cookie within the signal frame that will be audited during the \textit{sigreturn} system call. If there is no cookie in the frame, or the cookie in the frame doesn't match what the kernel expects, the process is gracefully terminated with a SIGSEV.
 \subsubsection{Design Choices}
@@ -94,8 +101,8 @@ To realize the goals outlined in the previous section we came up with the follow
 We implemented this protection mechanism on top of the 4.1 Linux tree, we selected 4.1 instead of mainline due to mainline not running correctly in our Xen virtual machine. We generate the cookie using the following code:
 \\
 \begin{verbatim}
-        sig_cookie = hash_64( ((unsigned long) &frame->sig_cookie ^ current->sigret_secret),
-                              sizeof(unsigned long) * BITS_PER_BYTE);
+sig_cookie = hash_64(&frame->sig_cookie ^ current->sigret_secret),
+                     sizeof(unsigned long) * BITS_PER_BYTE);
 \end{verbatim}
 
 
