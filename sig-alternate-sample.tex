@@ -34,7 +34,30 @@ To mitigate this new style of exploitation we design, implement and use a SROP m
 \section {Background}
 <TBD>
 \subsection{Signal Handling in Linux}
-<TBD>
+This section provides a brief background on signal handling in Linux. Signals provide an asynchronous notification mechanism for user applications through a special signal handler routine whenever an event interesting to the application is triggered. So, whenever a user application is interested to receive notifications about a particular event, it invokes {\texttt{sigaction}} system call and registers a signal handler function to be called for a particular event (information is stored in the \texttt{task\_struct} data structure that the kernel maintains for every process). The kernel's signal implementation makes a clear differentiation between signal generation and signal delivery for a variety of interesting reasons (e.g.: what happens when a signal is delivered to a process that is already blocked/sleeping).
+
+\subsubsection{Signal Generation}
+A process isn't always holding the CPU to react when a signal is sent to it. When a signal is generated, kernel updates the data structure of the process for which the signal was intended for, namely, \texttt{pending} and \texttt{blocked} members of \texttt{task\_struct} when \texttt{\_\_send\_signal} is invoked. Kernel also distinguishes a normal signal from a real-time signal by queueing all the instances of real-time signals. Once the members are updated, the kernel also sets a flag \texttt{TIF\_SIGPENDING} and wakes up the process
+if it was put to sleep/blocked earlier. The actual process has not yet received the signal notification but only the data-structures are updated to indicate that a signal is pending for the particular process.
+
+\subsubsection{Signal Delivery}
+If the process successfuly grabs the CPU, it gets notified about the signal under different scenarios - when a process executes a system call, the pending state of the signal is notified during the return path of the system call (or) the pending state is checked during the return path from an interrupt. Assuming the process does a system call, the register contents are saved on the kernel stack, kernel handles the system call and during the return path the function \texttt{syscall\_return\_slowpath} checks for flag \texttt{TIF\_SIGPENDING} and calls \texttt{do\_signal}. Before the signal handler could execute on the CPU, the kernel does constructs a frame of type (\texttt{struct sigframe}) on the user-space stack, so that once the signal handler completes its execution, it knows where to jump into the kernel. See Figure~\ref{fig:sig1} for a better understanding. 
+\par To achieve this behaviour, the kernel sets up the return address to a shared memory region (VDSO) that contains code to execute \texttt{sigreturn} system call and also copies the previously stored system registers on to the \texttt{uncontext} member of \texttt{struct sigframe} as shown in Figure~\ref{fig:sig2}. Now, it prepares the CPU registers to execute the signal handler (retrieves the stored information from the \texttt{task\_struct}) and switches the CPU to execute signal hander. It is interesting to reason why kernel constructs the sigframe on the user-space stack becasue signal handlers could invoke other system calls and more importantly it must return back to kernel at some point to restore the interrupted process. Once the signal handler runs to completion, it jumps to the \texttt{sigreturn} stub and restores the information stored in the \texttt{sigframe} - which is essentially the process that made the system call.
+
+\begin{figure}
+\centering
+\includegraphics[height=2.5in, width=3in]{3.pdf}
+\caption{Preparing Signal Delivery}
+\label{fig:sig1}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[height=2.5in, width=3in]{4.pdf}
+\caption{Sequence of events after signal handler returns}
+\label{fig:sig2}
+\end{figure}
+
 \subsection{Signal Return Oriented Programming}
 notes: 
 I want to mention how srop give an attacker a super easy way to populate registers in a controlling manner. In ROP to get good execution you have to coax values into registers via rop gadgets, if there are no gadgets that will populate the register the way you want you're SOL. But with SROP you just setup the sigframe the way you want and everything is good to go.
@@ -79,7 +102,7 @@ system call address and loads the fake ucontext frame to launch the shell.
 
 \begin{figure}
 \centering
-\includegraphics[height=2.5in, width=3in]{exploit}
+\includegraphics[height=2.5in, width=3in]{5.pdf}
 \caption{Stack frame of exploit code}
 \label{fig:SFEC}
 \end{figure}
