@@ -1,0 +1,32 @@
+\begin{thebibliography}{1}
+
+\bibitem{bosman2014framing}
+E.~Bosman and H.~Bos.
+\newblock Framing signals-a return to portable shellcode.
+\newblock In {\em Security and Privacy (SP), 2014 IEEE Symposium on}, pages
+  243--258. IEEE, 2014.
+
+\bibitem{cowan1998stackguard}
+C.~Cowan, C.~Pu, D.~Maier, J.~Walpole, P.~Bakke, S.~Beattie, A.~Grier,
+  P.~Wagle, Q.~Zhang, and H.~Hinton.
+\newblock Stackguard: Automatic adaptive detection and prevention of
+  buffer-overflow attacks.
+\newblock In {\em Usenix Security}, volume~98, pages 63--78, 1998.
+
+\bibitem{WXORX}
+T.~de. Raadt.
+\newblock i386 w xor x.
+\newblock 2003.
+
+\bibitem{li2010defeating}
+J.~Li, Z.~Wang, X.~Jiang, M.~Grace, and S.~Bahram.
+\newblock Defeating return-oriented rootkits with return-less kernels.
+\newblock In {\em Proceedings of the 5th European conference on Computer
+  systems}, pages 195--208. ACM, 2010.
+
+\bibitem{ASLR}
+B.~Spengler.
+\newblock Pax: The guaranteed end of arbitrary code execution".
+\newblock pages 22--33, October 2003.
+
+\end{thebibliography}
