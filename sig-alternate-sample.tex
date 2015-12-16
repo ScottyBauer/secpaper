@@ -1,8 +1,7 @@
 \documentclass{sig-alternate-05-2015}
 \begin{document}
 
-
-\title{Mitigating signal handler exploits in Linux}
+\title{Mitigation of "Sigreturn" exploits in Linux}
 \numberofauthors{2}
 \author{
 \alignauthor
@@ -29,9 +28,8 @@ Over the past 25 years Operating System designers and compiler designers have be
 To mitigate this new style of exploitation we design, implement and use a SROP mitigation technique based off of the idea of cookies originally developed to stop stack based buffer overflows. We test our implementation against two different SROP exploits, both of which are stopped by the new mitigation technique.
 
 \section {Background}
-<TBD>
 \subsection{Signal Handling in Linux}
-This section provides a brief background on signal handling in Linux. Signals provide an asynchronous notification mechanism for user applications through a special signal handler routine whenever an event interesting to the application is triggered. So, whenever a user application is interested to receive notifications about a particular event, it invokes {\texttt{sigaction}} system call and registers a signal handler function to be called for a particular event (information is stored in the \texttt{task\_struct} data structure that the kernel maintains for every process). The kernel's signal implementation makes a clear differentiation between signal generation and signal delivery for a variety of interesting reasons (e.g.: what happens when a signal is delivered to a process that is already blocked/sleeping).
+This section provides a brief background on signal handling in Linux. Signals provide an asynchronous notification mechanism for user applications through a special signal handler routine whenever an event interesting to the application is triggered. So, whenever a user application is interested to receive notifications about a particular event, it invokes {\texttt{sigaction}} system call and registers a signal handler function to be called for a particular event (information is stored in the \texttt{task\_struct} data structure that the kernel maintains for every process). The kernel's signal implementation makes a clear differentiation between signal generation and signal delivery for a variety of interesting reasons like - what happens when a signal is delivered to a process that is already blocked or sleeping, etc. The below subsections hightlight the differences that the kernel makes while generating and delivering a signal.
 
 \subsubsection{Signal Generation}
 A process isn't always holding the CPU to react when a signal is sent to it. When a signal is generated, kernel updates the data structure of the process for which the signal was intended for, namely, \texttt{pending} and \texttt{blocked} members of \texttt{task\_struct} when \texttt{\_\_send\_signal} is invoked. Kernel also distinguishes a normal signal from a real-time signal by queueing all the instances of real-time signals. Once the members are updated, the kernel also sets a flag \texttt{TIF\_SIGPENDING} and wakes up the process
@@ -105,7 +103,7 @@ system call address and loads the fake ucontext frame to launch the shell.
 \end{figure}
 
 \subsection{Mitigating SROP}
-To mitigate SROP exploits we need the kernel to remember or have the ability to derive whether or not the signal frame placed on the user stack is legitimate. A legitimate signal frame is a frame that was placed on the stack, by the kernel, during the delivery of a pending signal. If the kernel can determine the legitimacy of a signal frame it can then also detect signal frames that are apart of a SROP exploit, or buggy program. To give the kernel the ability to detect legitimate signal frames we place a cookie within the signal frame that will be audited during the \textit{sigreturn} system call. If there is no cookie in the frame, or the cookie in the frame doesn't match what the kernel expects, the process is gracefully terminated with a SIGSEV, more commonly known as a segmentation fault.
+To mitigate SROP exploits we need the kernel to remember or have the ability to derive whether or not the signal frame placed on the user stack is legitimate. A legitimate signal frame is a frame that was placed on the stack, by the kernel, during the delivery of a pending signal. If the kernel can determine the legitimacy of a signal frame it can then also detect signal frames that are apart of a SROP exploit, or buggy program. To give the kernel the ability to detect legitimate signal frames we place a cookie within the signal frame that will be audited during the \textit{sigreturn} system call. If there is no cookie in the frame, or the cookie in the frame doesn't match what the kernel expects, the process is gracefully terminated with a SIGSEV, more commonly known as a segmentation fault. 
 \subsubsection{Design Choices}
 There are a series of design choices we have to make in order to build a defense mechanism that is fast, secure and most important to us, could be accepted by the upstream kernel developers. The decision to use a cookie within the signal frame comes from the stack buffer overflow mechanism in StackGuard. A cookie in the signal frame increases the length of the frame only by 8 bytes, a small price to pay for protections against an exploitation method. To verify the cookie during a \textit{sigreturn} system call we need to remember the cookies we've placed in the frame. One idea is to save every cookie in a list on the process' local storage struct. This method fails for multiple reasons. First being an attacker could send many signals to a process causing the list to get filled up with cookies, after a certian time the range of cookies in the list is very large, possibly allowing an attacker to guess a correct cookie in the list. The second reason this fails is in implementation details. In order to save the cookies in this mechanism the kernel would have to allocate memory for nodes in the linked list on the signal-fast path. More over, on the sigreturn path the kernel would have to walk a linked list, possibly quite large, searching for the cookie. Due to these implementation issues saving every cookie was quickly excluded. Another approach we designed, but quickly shot down, was to hash the entire signal frame and save the hash at the bottom of the signal frame. We quickly realized an attacker could hash their custom signal frame, place the hash at the bottom, thus tricking the kernel. We decided the following goals had to be met:\\
 \begin{itemize}
@@ -115,8 +113,23 @@ There are a series of design choices we have to make in order to build a defense
   \item The cookie should not be the same for every signal, even within the same process.
 \end{itemize}
 %To mitigate SROP the kernel needs to remember during signal delivery that a signal was sent to the userland process. That way during the \textit{sigreturn} systemcall the kernel can verify that it is actually handling the cleanup of a signal it sent. %
+
+\begin{figure}
+\centering
+\includegraphics[height=2.7in, width=2.5in]{6.pdf}
+\caption{Storing \texttt{sig\_cookie}on user-space stack}
+\label{fig:sig6}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[height=2.7in, width=2.7in]{7.pdf}
+\caption{Verfication of \texttt{sig\_cookie} on sigreturn}
+\label{fig:sig7}
+\end{figure}
+
 \subsubsection{Implementation}
-To realize the goals outlined in the previous section we came up with the following implementation. Each process will generate a 64 bit secret during start up, the secret will be held in the process' control block. During delivery of a signal, the kernel will generate a cookie based on the 64 bit secret as well as the address, in user-land, of where the cookie will be stored. From there the kernel places the cookie at the address and continues with normal signal delivery. Upon execution of a \textit{sigreturn} system call, the kernel extracts the cookie from the frame, it then does the same calculation as above. If the calculated and extracted cookie differ then either the process broke the ABI by moving the signal frame, or there was an exploitation attempt. This implementation meets all the goals we outlined in the previous section. The kernel doesn't have to remember every cookie it places in a frame, it only has to remember a secret one . The signal delivery and signal return code remain fast, no memory allocations or costly list walks occur. The cookie changes for each signal due to the fact we use the memory address of where the cookie is to be stored in the actual cookie calculation.
+To realize the goals outlined in the previous section we came up with the following implementation. Each process will generate a 64 bit secret during start up, the secret will be held in the process' control block. During delivery of a signal, the kernel will generate a cookie based on the 64 bit secret as well as the address, in user-land, of where the cookie will be stored. From there the kernel places the cookie at the address and continues with normal signal delivery. Upon execution of a \textit{sigreturn} system call, the kernel extracts the cookie from the frame, it then does the same calculation as above. If the calculated and extracted cookie differ then either the process broke the ABI by moving the signal frame, or there was an exploitation attempt. This implementation meets all the goals we outlined in the previous section. The kernel doesn't have to remember every cookie it places in a frame, it only has to remember a secret one . The signal delivery and signal return code remain fast, no memory allocations or costly list walks occur. The cookie changes for each signal due to the fact we use the memory address of where the cookie is to be stored in the actual cookie calculation. Figures~\ref{fig:sig6} and ~\ref{fig:sig7} depict the same explained above.
 \\
 \indent
 We implemented this protection mechanism on top of the 4.1 Linux tree, we selected 4.1 instead of mainline due to mainline not running correctly in our Xen virtual machine. We generate the cookie using the following code:
